@@ -182,6 +182,7 @@ app = FastAPI(
     version=API_VERSION,
     lifespan=lifespan,
     openapi_url="/openapi.json",
+    root_path=os.getenv("ROOT_PATH", ""),   # <-- add this line
 )
 
 # Browsers reject credentialed wildcard CORS. Keep wildcard convenient for
