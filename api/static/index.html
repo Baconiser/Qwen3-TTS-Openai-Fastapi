@@ -916,7 +916,7 @@ response.<span class="function">stream_to_file</span>(<span class="string">"outp
         async function loadBackendStatus() {
             const statusContainer = document.getElementById('backendStatus');
             try {
-                const response = await fetch('/health');
+                const response = await fetch('health');
                 if (response.ok) {
                     const data = await response.json();
                     
