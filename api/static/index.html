@@ -770,7 +770,7 @@ response.<span class="function">stream_to_file</span>(<span class="string">"outp
             audioContainer.classList.remove('visible');
 
             try {
-                const response = await fetch('/v1/audio/speech', {
+                const response = await fetch('v1/audio/speech', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -827,9 +827,9 @@ response.<span class="function">stream_to_file</span>(<span class="string">"outp
         // Load voices from API
         async function loadVoices() {
             try {
-                let response = await fetch('/v1/audio/voices');
+                let response = await fetch('v1/audio/voices');
                 if (!response.ok) {
-                    response = await fetch('/v1/voices');
+                    response = await fetch('v1/voices');
                 }
                 if (response.ok) {
                     const data = await response.json();
@@ -869,7 +869,7 @@ response.<span class="function">stream_to_file</span>(<span class="string">"outp
         // Load models from API
         async function loadModels() {
             try {
-                const response = await fetch('/v1/models');
+                const response = await fetch('v1/models');
                 if (response.ok) {
                     const data = await response.json();
                     if (data.data && data.data.length > 0) {
@@ -1062,7 +1062,7 @@ response.<span class="function">stream_to_file</span>(<span class="string">"outp
             try {
                 const refAudioBase64 = await fileToBase64(refFile);
 
-                const response = await fetch('/v1/audio/voice-clone', {
+                const response = await fetch('v1/audio/voice-clone', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -1113,7 +1113,7 @@ response.<span class="function">stream_to_file</span>(<span class="string">"outp
             const cloneForm = document.getElementById('voiceCloneForm');
             const modelTypeInfo = document.getElementById('modelTypeInfo');
             try {
-                const response = await fetch('/v1/audio/voice-clone/capabilities');
+                const response = await fetch('v1/audio/voice-clone/capabilities');
                 if (response.ok) {
                     const data = await response.json();
                     const rawModelType = String(data.model_type || 'unknown');
