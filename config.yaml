@@ -52,7 +52,7 @@ optimization:
   use_fast_codebook: false
 
   # Compile the codebook predictor as well (default true, recommended).
-  compile_codebook_predictor: true
+  compile_codebook_predictor: false
 
   # Streaming-specific parameters
   streaming:
