@@ -46,7 +46,10 @@ optimization:
   use_cuda_graphs: false   # set true after verifying compile works on your GPU
 
   # Fast codebook generation (bypasses HuggingFace generate() overhead).
-  use_fast_codebook: true
+  # Upstream ships this OFF: modeling_qwen3_tts.py:2082 marks it
+  # "Disabled: needs debugging, currently slower". Enabling it crashed the
+  # process on first execution (RTX 4000 SFF Ada). Leave false.
+  use_fast_codebook: false
 
   # Compile the codebook predictor as well (default true, recommended).
   compile_codebook_predictor: true
