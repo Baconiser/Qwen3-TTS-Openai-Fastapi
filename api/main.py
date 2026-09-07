@@ -218,8 +218,8 @@ if ENABLE_VOICE_STUDIO:
             studio = build_app(
                 f"http://{voice_studio_host}:{PORT}", VOICE_LIBRARY_DIR
             )
-            app = gr.mount_gradio_app(app, studio, path="/voice-studio")
-            logger.info("Voice Studio mounted at /voice-studio")
+            app = gr.mount_gradio_app(app, studio, path="/qwen3-tts/voice-studio")
+            logger.info("Voice Studio mounted at /qwen3-tts/voice-studio")
         except Exception as exc:
             logger.warning("Failed to mount Voice Studio: %s", exc)
 
@@ -231,7 +231,7 @@ async def root():
         return FileResponse(index_path)
 
     studio_link = (
-        '<li><a href="/voice-studio">Voice Studio</a></li>'
+        '<li><a href="/qwen3-tts/voice-studio">Voice Studio</a></li>'
         if ENABLE_VOICE_STUDIO and GRADIO_AVAILABLE
         else ""
     )
