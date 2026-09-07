@@ -5,7 +5,8 @@ Optimized Qwen3-TTS backend with dynamic model switching, torch.compile,
 CUDA graph captures, voice prompt caching, and real-time streaming.
 
 This backend reads its model roster and optimization knobs from a YAML config
-file (default: ~/qwen3-tts/config.yaml, overridable via TTS_CONFIG env var).
+file (TTS_CONFIG, else ~/qwen3-tts/config.yaml, else the config.yaml that
+ships with the source tree).
 It auto-switches between the CustomVoice and Base models depending on the
 request (voice-library profiles always require the Base model).
 """
@@ -23,20 +24,41 @@ from .base import TTSBackend
 
 logger = logging.getLogger(__name__)
 
-# Location of the YAML config file (overridable via TTS_CONFIG env var)
-_DEFAULT_CONFIG_PATH = Path.home() / "qwen3-tts" / "config.yaml"
+# Location of the YAML config file. TTS_CONFIG wins outright; otherwise the
+# user's ~/qwen3-tts/config.yaml is preferred over the copy that ships with the
+# source tree (the Docker image lands that one at /app/config.yaml).
+_HOME_CONFIG_PATH = Path.home() / "qwen3-tts" / "config.yaml"
+_BUNDLED_CONFIG_PATH = Path(__file__).resolve().parent.parent.parent / "config.yaml"
+
+
+def _config_candidates() -> List[Path]:
+    """Return the config paths to try, in priority order."""
+    override = os.environ.get("TTS_CONFIG")
+    if override:
+        return [Path(override)]
+    return [_HOME_CONFIG_PATH, _BUNDLED_CONFIG_PATH]
 
 
 def _load_config() -> dict:
     """Load the YAML configuration file, returning an empty dict on failure."""
-    config_path = Path(os.environ.get("TTS_CONFIG", str(_DEFAULT_CONFIG_PATH)))
-    if config_path.exists():
+    for config_path in _config_candidates():
+        if not config_path.exists():
+            continue
         try:
             import yaml
             with open(config_path) as fh:
-                return yaml.safe_load(fh) or {}
+                config = yaml.safe_load(fh) or {}
+            logger.info(f"Loaded optimized-backend config from {config_path}")
+            return config
         except Exception as exc:
             logger.warning(f"Could not load config {config_path}: {exc}")
+
+    # An empty config leaves no models registered, so every request fails with
+    # "Unknown model key". Say so loudly here rather than at the first request.
+    logger.error(
+        "No optimized-backend config found (tried: %s). No models are registered.",
+        ", ".join(str(p) for p in _config_candidates()),
+    )
     return {}
 
 

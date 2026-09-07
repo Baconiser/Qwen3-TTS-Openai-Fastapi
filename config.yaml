@@ -32,7 +32,10 @@ optimization:
 
   # torch.compile mode.  Options: default | reduce-overhead | max-autotune
   # max-autotune gives the best throughput after a ~75 s compilation on first start.
-  compile_mode: max-autotune
+  # max-autotune cannot engage on GPUs with few SMs (RTX 4000 Ada has 48):
+  # inductor logs "Not enough SMs to use max_autotune_gemm mode" and skips it,
+  # leaving only the compile cost. 'default' is the stable choice here.
+  compile_mode: default
 
   # Whether to enable torch.compile at all.  Set to false to skip compilation
   # (faster startup, lower throughput).
