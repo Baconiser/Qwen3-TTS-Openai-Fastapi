@@ -11,7 +11,7 @@ import numpy as np
 import soundfile as sf
 from io import BytesIO
 
-API_URL = "http://localhost:8880/v1/audio/speech"
+API_URL = "http://localhost:8880/qwen-3tts/v1/audio/speech"
 
 TEST_CASES = [
     ("Hello world!", "Short"),
@@ -88,7 +88,7 @@ def main():
     print("\nWaiting for API to be ready...")
     for i in range(30):
         try:
-            response = requests.get("http://localhost:8880/health")
+            response = requests.get("http://localhost:8880/qwen-3tts/health")
             if response.status_code == 200:
                 print("✓ API is ready!")
                 break

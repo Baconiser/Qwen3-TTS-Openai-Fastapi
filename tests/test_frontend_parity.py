@@ -24,9 +24,9 @@ def test_frontend_includes_normalization_options_payload():
 def test_frontend_uses_model_and_capability_endpoints_for_differentiation():
     """Frontend must consume API endpoints that describe model differences."""
     html = INDEX_HTML_PATH.read_text(encoding="utf-8")
-    assert "/v1/models/" in html
-    assert "/v1/audio/voices" in html
-    assert "/v1/audio/voice-clone/capabilities" in html
+    assert "/qwen-3tts/v1/models/" in html
+    assert "/qwen-3tts/v1/audio/voices" in html
+    assert "/qwen-3tts/v1/audio/voice-clone/capabilities" in html
     assert "Backend model type" in html
     assert "voicedesign" in html
     assert "non-streaming" in html

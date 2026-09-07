@@ -8,7 +8,7 @@ import time
 import requests
 import sys
 
-API_URL = "http://localhost:8880/v1/audio/speech"
+API_URL = "http://localhost:8880/qwen-3tts/v1/audio/speech"
 
 def test_optimization():
     """Quick test to verify optimizations are working."""
@@ -20,7 +20,7 @@ def test_optimization():
     print("\n⏳ Waiting for API to be ready...")
     for i in range(60):
         try:
-            response = requests.get("http://localhost:8880/health", timeout=2)
+            response = requests.get("http://localhost:8880/qwen-3tts/health", timeout=2)
             if response.status_code == 200:
                 health = response.json()
                 print(f"✅ API is ready!")

@@ -44,7 +44,7 @@ DEFAULT_LIBRARY_DIR = Path(os.environ.get("VOICE_LIBRARY_DIR", "./voice_library"
 # Base URL pointing to the running Qwen3-TTS API.  If not provided, this
 # defaults to the local server on port 8880.  It may be overridden via the
 # TTS_BASE_URL environment variable or passed to ``build_app``.
-DEFAULT_TTS_BASE_URL = os.environ.get("TTS_BASE_URL", "http://localhost:8880").rstrip("/")
+DEFAULT_TTS_BASE_URL = os.environ.get("TTS_BASE_URL", "http://localhost:8880/qwen-3tts").rstrip("/")
 
 # Default timeout for API requests in seconds.  Can be customized via the
 # TTS_TIMEOUT_S environment variable or overridden at runtime.
@@ -348,7 +348,7 @@ def build_app(initial_base_url: str, initial_library_dir: Path) -> gr.Blocks:
                 base_url_in = gr.Textbox(
                     label="TTS Server Base URL",
                     value=initial_base_url,
-                    placeholder="http://localhost:8880",
+                    placeholder="http://localhost:8880/qwen-3tts",
                 )
                 library_dir_in = gr.Textbox(
                     label="Voice Library Dir",

@@ -6,7 +6,7 @@ Extended warmup and benchmark to verify torch.compile() speedup.
 import time
 import requests
 
-API_URL = "http://localhost:8880/v1/audio/speech"
+API_URL = "http://localhost:8880/qwen-3tts/v1/audio/speech"
 
 def warmup_and_benchmark():
     print("🔥 Extended Warmup for torch.compile()")

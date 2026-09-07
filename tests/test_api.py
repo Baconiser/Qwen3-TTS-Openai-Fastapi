@@ -28,11 +28,11 @@ def reset_backend_after_test():
 
 
 class TestHealthEndpoint:
-    """Tests for /health endpoint."""
+    """Tests for /qwen-3tts/health endpoint."""
     
     def test_health_endpoint_returns_status(self, client):
         """Test that health endpoint returns status information."""
-        response = client.get("/health")
+        response = client.get("/qwen-3tts/health")
         assert response.status_code == 200
         
         data = response.json()
@@ -43,7 +43,7 @@ class TestHealthEndpoint:
     
     def test_health_endpoint_includes_backend_info(self, client):
         """Test that health endpoint includes backend details."""
-        response = client.get("/health")
+        response = client.get("/qwen-3tts/health")
         assert response.status_code == 200
         
         data = response.json()
@@ -53,7 +53,7 @@ class TestHealthEndpoint:
     
     def test_health_endpoint_includes_device_info(self, client):
         """Test that health endpoint includes device information."""
-        response = client.get("/health")
+        response = client.get("/qwen-3tts/health")
         assert response.status_code == 200
         
         data = response.json()
@@ -62,11 +62,11 @@ class TestHealthEndpoint:
 
 
 class TestModelsEndpoint:
-    """Tests for /v1/models endpoint."""
+    """Tests for /qwen-3tts/v1/models endpoint."""
     
     def test_list_models_endpoint(self, client):
         """Test that models endpoint returns list of models."""
-        response = client.get("/v1/models")
+        response = client.get("/qwen-3tts/v1/models")
         assert response.status_code == 200
         
         data = response.json()
@@ -78,7 +78,7 @@ class TestModelsEndpoint:
     
     def test_models_include_qwen3_tts(self, client):
         """Test that qwen3-tts model is in the list."""
-        response = client.get("/v1/models")
+        response = client.get("/qwen-3tts/v1/models")
         data = response.json()
         
         model_ids = [model["id"] for model in data["data"]]
@@ -86,7 +86,7 @@ class TestModelsEndpoint:
     
     def test_models_include_openai_compatible(self, client):
         """Test that OpenAI-compatible models are in the list."""
-        response = client.get("/v1/models")
+        response = client.get("/qwen-3tts/v1/models")
         data = response.json()
         
         model_ids = [model["id"] for model in data["data"]]
@@ -95,7 +95,7 @@ class TestModelsEndpoint:
     
     def test_get_specific_model(self, client):
         """Test getting a specific model by ID."""
-        response = client.get("/v1/models/qwen3-tts")
+        response = client.get("/qwen-3tts/v1/models/qwen3-tts")
         assert response.status_code == 200
         
         data = response.json()
@@ -105,16 +105,16 @@ class TestModelsEndpoint:
     
     def test_get_nonexistent_model_returns_404(self, client):
         """Test that requesting non-existent model returns 404."""
-        response = client.get("/v1/models/nonexistent-model")
+        response = client.get("/qwen-3tts/v1/models/nonexistent-model")
         assert response.status_code == 404
 
 
 class TestVoicesEndpoint:
-    """Tests for /v1/voices endpoint."""
+    """Tests for /qwen-3tts/v1/voices endpoint."""
     
     def test_list_voices_endpoint(self, client):
         """Test that voices endpoint returns voice list."""
-        response = client.get("/v1/voices")
+        response = client.get("/qwen-3tts/v1/voices")
         assert response.status_code == 200
         
         data = response.json()
@@ -125,7 +125,7 @@ class TestVoicesEndpoint:
     
     def test_voices_include_defaults(self, client):
         """Test that default voices are included."""
-        response = client.get("/v1/voices")
+        response = client.get("/qwen-3tts/v1/voices")
         data = response.json()
         
         voice_ids = [voice["id"] for voice in data["voices"]]
@@ -133,8 +133,8 @@ class TestVoicesEndpoint:
         assert "Vivian" in voice_ids or "alloy" in voice_ids
     
     def test_alternate_voices_endpoint(self, client):
-        """Test alternate /v1/audio/voices endpoint."""
-        response = client.get("/v1/audio/voices")
+        """Test alternate /qwen-3tts/v1/audio/voices endpoint."""
+        response = client.get("/qwen-3tts/v1/audio/voices")
         assert response.status_code == 200
         
         data = response.json()
@@ -142,12 +142,12 @@ class TestVoicesEndpoint:
 
 
 class TestSpeechEndpoint:
-    """Tests for /v1/audio/speech endpoint."""
+    """Tests for /qwen-3tts/v1/audio/speech endpoint."""
     
     def test_speech_endpoint_requires_input(self, client):
         """Test that speech endpoint requires input text."""
         response = client.post(
-            "/v1/audio/speech",
+            "/qwen-3tts/v1/audio/speech",
             json={
                 "model": "qwen3-tts",
                 "voice": "Vivian",
@@ -159,7 +159,7 @@ class TestSpeechEndpoint:
     def test_speech_endpoint_invalid_model(self, client):
         """Test that invalid model returns error."""
         response = client.post(
-            "/v1/audio/speech",
+            "/qwen-3tts/v1/audio/speech",
             json={
                 "model": "invalid-model",
                 "input": "Hello",
@@ -253,7 +253,7 @@ class TestSpeechVoiceLibraryKwargsCompatibility:
         oc._ref_audio_cache.clear()
 
         response = client.post(
-            "/v1/audio/speech",
+            "/qwen-3tts/v1/audio/speech",
             json={
                 "model": "qwen3-tts",
                 "input": "hello",
@@ -310,7 +310,7 @@ class TestSpeechVoiceLibraryKwargsCompatibility:
         oc._ref_audio_cache.clear()
 
         response = client.post(
-            "/v1/audio/speech",
+            "/qwen-3tts/v1/audio/speech",
             json={
                 "model": "qwen3-tts",
                 "input": "hello",
@@ -340,7 +340,7 @@ class TestVoiceCloneEndpoints:
         # Set the mock as the global backend instance
         factory._backend_instance = mock_backend
         
-        response = client.get("/v1/audio/voice-clone/capabilities")
+        response = client.get("/qwen-3tts/v1/audio/voice-clone/capabilities")
         assert response.status_code == 200
 
         data = response.json()
@@ -364,7 +364,7 @@ class TestVoiceCloneEndpoints:
         
         factory._backend_instance = mock_backend
         
-        response = client.get("/v1/audio/voice-clone/capabilities")
+        response = client.get("/qwen-3tts/v1/audio/voice-clone/capabilities")
         assert response.status_code == 200
 
         data = response.json()
@@ -386,7 +386,7 @@ class TestVoiceCloneEndpoints:
         
         factory._backend_instance = mock_backend
         
-        response = client.get("/v1/audio/voice-clone/capabilities")
+        response = client.get("/qwen-3tts/v1/audio/voice-clone/capabilities")
         assert response.status_code == 200
 
         data = response.json()
@@ -398,7 +398,7 @@ class TestVoiceCloneEndpoints:
     def test_voice_clone_requires_input(self, client):
         """Test that voice clone endpoint requires input text."""
         response = client.post(
-            "/v1/audio/voice-clone",
+            "/qwen-3tts/v1/audio/voice-clone",
             json={
                 "ref_audio": "dGVzdA==",  # base64 "test"
             }
@@ -420,7 +420,7 @@ class TestVoiceCloneEndpoints:
         factory._backend_instance = mock_backend
         
         response = client.post(
-            "/v1/audio/voice-clone",
+            "/qwen-3tts/v1/audio/voice-clone",
             json={
                 "input": "Hello world",
                 "ref_audio": "dGVzdA==",  # base64 "test"
@@ -447,7 +447,7 @@ class TestVoiceCloneEndpoints:
         factory._backend_instance = mock_backend
         
         response = client.post(
-            "/v1/audio/voice-clone",
+            "/qwen-3tts/v1/audio/voice-clone",
             json={
                 "input": "Hello world",
                 "ref_audio": "dGVzdA==",  # base64 "test"
@@ -467,12 +467,12 @@ class TestRootEndpoint:
     
     def test_root_returns_html(self, client):
         """Test that root endpoint returns HTML."""
-        response = client.get("/")
+        response = client.get("/qwen-3tts/")
         assert response.status_code == 200
         assert "text/html" in response.headers["content-type"]
     
     def test_root_contains_qwen_tts(self, client):
         """Test that root page mentions Qwen3-TTS."""
-        response = client.get("/")
+        response = client.get("/qwen-3tts/")
         assert response.status_code == 200
         assert b"Qwen" in response.content or b"TTS" in response.content

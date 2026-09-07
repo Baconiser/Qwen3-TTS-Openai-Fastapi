@@ -101,7 +101,7 @@ The API is identical to the official backend:
 ```python
 from openai import OpenAI
 
-client = OpenAI(base_url="http://localhost:8880/v1", api_key="not-needed")
+client = OpenAI(base_url="http://localhost:8880/qwen-3tts/v1", api_key="not-needed")
 
 response = client.audio.speech.create(
     model="qwen3-tts",
@@ -121,22 +121,22 @@ Qwen3-TTS model families map to distinct characteristics:
 
 In this FastAPI wrapper, the primary generation endpoint remains:
 
-- `POST /v1/audio/speech` (OpenAI-compatible request body with extensions like `language`, `instruct`, normalization options)
+- `POST /qwen-3tts/v1/audio/speech` (OpenAI-compatible request body with extensions like `language`, `instruct`, normalization options)
 
 Voice cloning is exposed as a dedicated endpoint:
 
-- `POST /v1/audio/voice-clone` (`ref_audio`, `ref_text`, `x_vector_only_mode`, `language`, `response_format`, `speed`)
+- `POST /qwen-3tts/v1/audio/voice-clone` (`ref_audio`, `ref_text`, `x_vector_only_mode`, `language`, `response_format`, `speed`)
 
 Voice listing is available via:
 
-- `GET /v1/audio/voices` (alias: `/v1/voices`)
+- `GET /qwen-3tts/v1/audio/voices` (alias: `/qwen-3tts/v1/voices`)
 
 ### Health Check
 
 Check backend status:
 
 ```bash
-curl http://localhost:8880/health
+curl http://localhost:8880/qwen-3tts/health
 ```
 
 Response:

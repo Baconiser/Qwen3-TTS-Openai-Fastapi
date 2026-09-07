@@ -241,8 +241,8 @@ def main():
     parser = argparse.ArgumentParser(description="TTS Benchmark Script")
     parser.add_argument(
         "--url", 
-        default="http://localhost:8880",
-        help="Server base URL (default: http://localhost:8880)"
+        default="http://localhost:8880/qwen-3tts",
+        help="Server base URL (default: http://localhost:8880/qwen-3tts)"
     )
     parser.add_argument(
         "--label",

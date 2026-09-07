@@ -92,10 +92,10 @@ Once loaded, custom voices appear in the voice list and can be used like any bui
 
 ```bash
 # List voices (custom voices included)
-curl http://localhost:8880/v1/audio/voices
+curl http://localhost:8880/qwen-3tts/v1/audio/voices
 
 # Generate speech with a custom voice
-curl -X POST http://localhost:8880/v1/audio/speech \
+curl -X POST http://localhost:8880/qwen-3tts/v1/audio/speech \
   -H "Content-Type: application/json" \
   -d '{"model":"qwen3-tts","voice":"Alice","input":"Hello!"}' \
   -o output.mp3

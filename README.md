@@ -1,16 +1,16 @@
 # Qwen3-TTS OpenAI-Compatible FastAPI Server
 
-Serve Qwen3-TTS behind the OpenAI `POST /v1/audio/speech` interface, with optional voice cloning, saved voice profiles, real-time PCM streaming, CUDA/ROCm/CPU backends, and native Apple Silicon support.
+Serve Qwen3-TTS behind the OpenAI `POST /qwen-3tts/v1/audio/speech` interface, with optional voice cloning, saved voice profiles, real-time PCM streaming, CUDA/ROCm/CPU backends, and native Apple Silicon support.
 
 This repository is based on the Qwen3-TTS implementation from the Alibaba Qwen team and adds an API/deployment layer intended for local applications and self-hosted services.
 
 ## Highlights
 
-- OpenAI-compatible `POST /v1/audio/speech`
-- Model and voice discovery under `/v1/models` and `/v1/voices`
+- OpenAI-compatible `POST /qwen-3tts/v1/audio/speech`
+- Model and voice discovery under `/qwen-3tts/v1/models` and `/qwen-3tts/v1/voices`
 - MP3, Opus, AAC, FLAC, WAV, and signed 16-bit PCM output
 - Official, optimized, vLLM-Omni, PyTorch CPU, OpenVINO, and MLX backends
-- Base-model voice cloning through `/v1/audio/voice-clone`
+- Base-model voice cloning through `/qwen-3tts/v1/audio/voice-clone`
 - Persistent voice-library profiles through `voice="clone:ProfileName"`
 - Lazy model loading, bounded generation concurrency, warmup, and health checks
 - Automatic long-text chunking with punctuation-aware boundaries
@@ -24,7 +24,7 @@ Qwen3-TTS exposes different checkpoint families with different generation method
 | Checkpoint type | Use it for | Do not use it for |
 |---|---|---|
 | `*-CustomVoice` | Preset speakers such as Vivian, Ryan, Serena, Dylan, and others | Reference-audio voice cloning |
-| `*-Base` | `/v1/audio/voice-clone` and saved `clone:` profiles | Preset-speaker `/v1/audio/speech` requests |
+| `*-Base` | `/qwen-3tts/v1/audio/voice-clone` and saved `clone:` profiles | Preset-speaker `/qwen-3tts/v1/audio/speech` requests |
 | `*-VoiceDesign` | Voice design workflows supported by the underlying model/backend | Assuming preset-speaker or Base-model semantics |
 
 For normal OpenAI-style TTS, start with a **CustomVoice** checkpoint. For voice cloning, run a **Base** checkpoint and call the clone endpoint.
@@ -57,13 +57,13 @@ The server listens on `http://localhost:8880` by default.
 
 Useful URLs:
 
-- Web interface: `http://localhost:8880/`
-- Swagger: `http://localhost:8880/docs`
-- Health: `http://localhost:8880/health`
-- Models: `http://localhost:8880/v1/models`
-- Voices: `http://localhost:8880/v1/voices`
+- Web interface: `http://localhost:8880/qwen-3tts/`
+- Swagger: `http://localhost:8880/qwen-3tts/docs`
+- Health: `http://localhost:8880/qwen-3tts/health`
+- Models: `http://localhost:8880/qwen-3tts/v1/models`
+- Voices: `http://localhost:8880/qwen-3tts/v1/voices`
 
-The backend loads lazily by default, so `/health` can report `initializing` until the first synthesis request.
+The backend loads lazily by default, so `/qwen-3tts/health` can report `initializing` until the first synthesis request.
 
 ## OpenAI Python client
 
@@ -71,7 +71,7 @@ The backend loads lazily by default, so `/health` can report `initializing` unti
 from openai import OpenAI
 
 client = OpenAI(
-    base_url="http://localhost:8880/v1",
+    base_url="http://localhost:8880/qwen-3tts/v1",
     api_key="not-needed",
 )
 
@@ -96,13 +96,13 @@ OpenAI voice aliases are accepted:
 | `onyx` | Evan |
 | `shimmer` | Lily |
 
-The exact native speaker list depends on the selected checkpoint and backend. Query `/v1/voices` rather than hard-coding the table above.
+The exact native speaker list depends on the selected checkpoint and backend. Query `/qwen-3tts/v1/voices` rather than hard-coding the table above.
 
 ## cURL
 
 ```bash
 curl --fail --show-error \
-  http://localhost:8880/v1/audio/speech \
+  http://localhost:8880/qwen-3tts/v1/audio/speech \
   -H 'Content-Type: application/json' \
   -d '{
     "model": "tts-1",
@@ -174,7 +174,7 @@ request = {
 
 with httpx.stream(
     "POST",
-    "http://localhost:8880/v1/audio/speech",
+    "http://localhost:8880/qwen-3tts/v1/audio/speech",
     json=request,
     timeout=None,
 ) as response:
@@ -249,7 +249,7 @@ export CPU_INTEROP=2
 python -m api.main
 ```
 
-A Base checkpoint is valid for `/v1/audio/voice-clone`, but it cannot serve preset-speaker `/v1/audio/speech` calls.
+A Base checkpoint is valid for `/qwen-3tts/v1/audio/voice-clone`, but it cannot serve preset-speaker `/qwen-3tts/v1/audio/speech` calls.
 
 ## Voice cloning
 
@@ -271,7 +271,7 @@ with open("reference.wav", "rb") as file:
     reference = base64.b64encode(file.read()).decode("ascii")
 
 response = requests.post(
-    "http://localhost:8880/v1/audio/voice-clone",
+    "http://localhost:8880/qwen-3tts/v1/audio/voice-clone",
     json={
         "input": "This sentence uses the reference speaker.",
         "ref_audio": reference,
@@ -411,7 +411,7 @@ Review device mappings in `docker-compose.rocm.yml`; render-node names vary betw
 | `TTS_MAX_CONCURRENT` | `1` | Concurrent generation limit per process |
 | `TTS_IDLE_TIMEOUT_SECONDS` | `0` | Opt-in idle shutdown; `0` disables it |
 | `CORS_ORIGINS` | `*` | Comma-separated allowed browser origins |
-| `ENABLE_VOICE_STUDIO` | `false` | Mount Gradio at `/voice-studio` |
+| `ENABLE_VOICE_STUDIO` | `false` | Mount Gradio at `/qwen-3tts/voice-studio` |
 | `VOICE_LIBRARY_DIR` | `./voice_library` | Saved profile root |
 | `TTS_CUSTOM_VOICES` | `./custom_voices` | Legacy/custom voice directory |
 | `TTS_CONFIG` | `~/qwen3-tts/config.yaml` | Optimized-backend YAML |
@@ -461,7 +461,7 @@ Use `response_format="wav"` while diagnosing. The API now reports an encoding er
 
 ### Base model rejects a normal speech request
 
-Base checkpoints clone reference voices. Switch to a `*-CustomVoice` checkpoint for preset speakers, or use `/v1/audio/voice-clone`.
+Base checkpoints clone reference voices. Switch to a `*-CustomVoice` checkpoint for preset speakers, or use `/qwen-3tts/v1/audio/voice-clone`.
 
 ### First request is slow
 

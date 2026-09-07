@@ -637,24 +637,24 @@
             <section class="card">
                 <h2>API Endpoints</h2>
                 <div class="links-grid">
-                    <a href="/docs" class="link-card">
+                    <a href="/qwen-3tts/docs" class="link-card">
                         <span class="icon">📖</span>
-                        <span class="title">/docs</span>
+                        <span class="title">/qwen-3tts/docs</span>
                         <span class="desc">Swagger UI Documentation</span>
                     </a>
-                    <a href="/redoc" class="link-card">
+                    <a href="/qwen-3tts/redoc" class="link-card">
                         <span class="icon">📚</span>
-                        <span class="title">/redoc</span>
+                        <span class="title">/qwen-3tts/redoc</span>
                         <span class="desc">ReDoc Documentation</span>
                     </a>
-                    <a href="/v1/models" class="link-card">
+                    <a href="/qwen-3tts/v1/models" class="link-card">
                         <span class="icon">🤖</span>
-                        <span class="title">/v1/models</span>
+                        <span class="title">/qwen-3tts/v1/models</span>
                         <span class="desc">List Available Models</span>
                     </a>
-                    <a href="/v1/voices" class="link-card">
+                    <a href="/qwen-3tts/v1/voices" class="link-card">
                         <span class="icon">🎤</span>
-                        <span class="title">/v1/voices</span>
+                        <span class="title">/qwen-3tts/v1/voices</span>
                         <span class="desc">List Available Voices</span>
                     </a>
                 </div>
@@ -669,7 +669,7 @@
 
 <span class="comment"># Create client pointing to local server</span>
 client = OpenAI(
-    base_url=<span class="string">"http://localhost:8880/v1"</span>,
+    base_url=<span class="string">"http://localhost:8880/qwen-3tts/v1"</span>,
     api_key=<span class="string">"not-needed"</span>
 )
 
@@ -770,7 +770,7 @@ response.<span class="function">stream_to_file</span>(<span class="string">"outp
             audioContainer.classList.remove('visible');
 
             try {
-                const response = await fetch('v1/audio/speech', {
+                const response = await fetch('/qwen-3tts/v1/audio/speech', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -827,9 +827,9 @@ response.<span class="function">stream_to_file</span>(<span class="string">"outp
         // Load voices from API
         async function loadVoices() {
             try {
-                let response = await fetch('v1/audio/voices');
+                let response = await fetch('/qwen-3tts/v1/audio/voices');
                 if (!response.ok) {
-                    response = await fetch('v1/voices');
+                    response = await fetch('/qwen-3tts/v1/voices');
                 }
                 if (response.ok) {
                     const data = await response.json();
@@ -869,7 +869,7 @@ response.<span class="function">stream_to_file</span>(<span class="string">"outp
         // Load models from API
         async function loadModels() {
             try {
-                const response = await fetch('v1/models');
+                const response = await fetch('/qwen-3tts/v1/models');
                 if (response.ok) {
                     const data = await response.json();
                     if (data.data && data.data.length > 0) {
@@ -897,7 +897,7 @@ response.<span class="function">stream_to_file</span>(<span class="string">"outp
                 return;
             }
             try {
-                const response = await fetch(`/v1/models/${encodeURIComponent(modelSelect.value)}`);
+                const response = await fetch(`/qwen-3tts/v1/models/${encodeURIComponent(modelSelect.value)}`);
                 if (response.ok) {
                     const data = await response.json();
                     const safeOwner = /^[A-Za-z0-9_.-]+$/.test(data.owned_by || '') ? data.owned_by : 'unknown';
@@ -916,7 +916,7 @@ response.<span class="function">stream_to_file</span>(<span class="string">"outp
         async function loadBackendStatus() {
             const statusContainer = document.getElementById('backendStatus');
             try {
-                const response = await fetch('health');
+                const response = await fetch('/qwen-3tts/health');
                 if (response.ok) {
                     const data = await response.json();
                     
@@ -1062,7 +1062,7 @@ response.<span class="function">stream_to_file</span>(<span class="string">"outp
             try {
                 const refAudioBase64 = await fileToBase64(refFile);
 
-                const response = await fetch('v1/audio/voice-clone', {
+                const response = await fetch('/qwen-3tts/v1/audio/voice-clone', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -1113,7 +1113,7 @@ response.<span class="function">stream_to_file</span>(<span class="string">"outp
             const cloneForm = document.getElementById('voiceCloneForm');
             const modelTypeInfo = document.getElementById('modelTypeInfo');
             try {
-                const response = await fetch('v1/audio/voice-clone/capabilities');
+                const response = await fetch('/qwen-3tts/v1/audio/voice-clone/capabilities');
                 if (response.ok) {
                     const data = await response.json();
                     const rawModelType = String(data.model_type || 'unknown');

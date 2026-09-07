@@ -78,7 +78,7 @@ qwen-tts-api
 ```python
 from openai import OpenAI
 
-client = OpenAI(base_url="http://localhost:8880/v1", api_key="not-needed")
+client = OpenAI(base_url="http://localhost:8880/qwen-3tts/v1", api_key="not-needed")
 
 response = client.audio.speech.create(
     model="qwen3-tts",

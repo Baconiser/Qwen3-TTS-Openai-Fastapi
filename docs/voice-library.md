@@ -45,17 +45,17 @@ Set the `VOICE_LIBRARY_DIR` environment variable to point anywhere on the filesy
 ## Using a profile
 
 Pass the profile name with the `clone:` prefix as the `voice` field in a
-standard `/v1/audio/speech` request:
+standard `/qwen-3tts/v1/audio/speech` request:
 
 ```bash
 # Non-streaming — returns MP3
-curl -X POST http://localhost:8880/v1/audio/speech \
+curl -X POST http://localhost:8880/qwen-3tts/v1/audio/speech \
   -H "Content-Type: application/json" \
   -d '{"input": "Hello!", "voice": "clone:Alice", "model": "tts-1"}' \
   --output speech.mp3
 
 # Real-time streaming — returns raw PCM (requires optimized backend)
-curl -X POST http://localhost:8880/v1/audio/speech \
+curl -X POST http://localhost:8880/qwen-3tts/v1/audio/speech \
   -H "Content-Type: application/json" \
   -d '{
         "input": "Hello!",
@@ -72,7 +72,7 @@ Or with the OpenAI Python SDK:
 ```python
 from openai import OpenAI
 
-client = OpenAI(base_url="http://localhost:8880/v1", api_key="not-needed")
+client = OpenAI(base_url="http://localhost:8880/qwen-3tts/v1", api_key="not-needed")
 
 response = client.audio.speech.create(
     model="tts-1",
@@ -84,7 +84,7 @@ response.stream_to_file("alice.mp3")
 
 ## Listing profiles via the API
 
-Saved profiles appear in the `/v1/voices` (or `/v1/audio/voices`) endpoint
+Saved profiles appear in the `/qwen-3tts/v1/voices` (or `/qwen-3tts/v1/audio/voices`) endpoint
 response under the `voices` array, with their id prefixed by `clone:`:
 
 ```json

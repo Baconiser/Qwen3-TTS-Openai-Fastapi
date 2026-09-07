@@ -177,12 +177,14 @@ app = FastAPI(
     title="Qwen3-TTS API",
     description=(
         "OpenAI-compatible text-to-speech API powered by Qwen3-TTS. "
-        "Use POST /v1/audio/speech and discover models/voices under /v1."
+        "Use POST /qwen-3tts/v1/audio/speech and discover models/voices under /qwen-3tts/v1."
     ),
     version=API_VERSION,
     lifespan=lifespan,
-    openapi_url="/openapi.json",
-    root_path=os.getenv("ROOT_PATH", ""),   # <-- add this line
+    openapi_url="/qwen-3tts/openapi.json",
+    docs_url="/qwen-3tts/docs",
+    redoc_url="/qwen-3tts/redoc",
+    root_path=os.getenv("ROOT_PATH", ""),
 )
 
 # Browsers reject credentialed wildcard CORS. Keep wildcard convenient for
@@ -197,10 +199,10 @@ app.add_middleware(
 
 from .routers.openai_compatible import router as openai_router
 
-app.include_router(openai_router, prefix="/v1")
+app.include_router(openai_router, prefix="/qwen-3tts/v1")
 
 if STATIC_DIR.exists():
-    app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+    app.mount("/qwen-3tts/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 if ENABLE_VOICE_STUDIO:
     if not GRADIO_AVAILABLE:
@@ -216,22 +218,22 @@ if ENABLE_VOICE_STUDIO:
 
             voice_studio_host = "localhost" if HOST in {"0.0.0.0", "::"} else HOST
             studio = build_app(
-                f"http://{voice_studio_host}:{PORT}", VOICE_LIBRARY_DIR
+                f"http://{voice_studio_host}:{PORT}/qwen-3tts", VOICE_LIBRARY_DIR
             )
-            app = gr.mount_gradio_app(app, studio, path="/voice-studio")
-            logger.info("Voice Studio mounted at /voice-studio")
+            app = gr.mount_gradio_app(app, studio, path="/qwen-3tts/voice-studio")
+            logger.info("Voice Studio mounted at /qwen-3tts/voice-studio")
         except Exception as exc:
             logger.warning("Failed to mount Voice Studio: %s", exc)
 
 
-@app.get("/", response_class=HTMLResponse)
+@app.get("/qwen-3tts/", response_class=HTMLResponse)
 async def root():
     index_path = STATIC_DIR / "index.html"
     if index_path.exists():
         return FileResponse(index_path)
 
     studio_link = (
-        '<li><a href="/voice-studio">Voice Studio</a></li>'
+        '<li><a href="/qwen-3tts/voice-studio">Voice Studio</a></li>'
         if ENABLE_VOICE_STUDIO and GRADIO_AVAILABLE
         else ""
     )
@@ -249,12 +251,12 @@ async def root():
 </head>
 <body>
   <h1>Qwen3-TTS OpenAI-compatible API</h1>
-  <p>Server version {API_VERSION}. Use <code>POST /v1/audio/speech</code>.</p>
+  <p>Server version {API_VERSION}. Use <code>POST /qwen-3tts/v1/audio/speech</code>.</p>
   <ul>
-    <li><a href="/docs">Swagger API documentation</a></li>
-    <li><a href="/redoc">ReDoc API documentation</a></li>
-    <li><a href="/v1/models">Models</a></li>
-    <li><a href="/v1/voices">Voices</a></li>
+    <li><a href="/qwen-3tts/docs">Swagger API documentation</a></li>
+    <li><a href="/qwen-3tts/redoc">ReDoc API documentation</a></li>
+    <li><a href="/qwen-3tts/v1/models">Models</a></li>
+    <li><a href="/qwen-3tts/v1/voices">Voices</a></li>
     {studio_link}
   </ul>
 </body>
@@ -262,7 +264,7 @@ async def root():
 """
 
 
-@app.get("/health")
+@app.get("/qwen-3tts/health")
 async def health_check():
     try:
         from .backends import get_backend

@@ -520,7 +520,7 @@ class TestFactoryCustomVoiceIntegration:
 class TestRouterCustomVoiceRouting:
 
     def test_speech_with_custom_voice_routes_correctly(self, monkeypatch):
-        """POST /v1/audio/speech with a custom voice should use custom path."""
+        """POST /qwen-3tts/v1/audio/speech with a custom voice should use custom path."""
         from fastapi.testclient import TestClient
         from api.main import app
         from api.backends import factory
@@ -537,7 +537,7 @@ class TestRouterCustomVoiceRouting:
 
         client = TestClient(app)
         response = client.post(
-            "/v1/audio/speech",
+            "/qwen-3tts/v1/audio/speech",
             json={
                 "model": "qwen3-tts",
                 "input": "Hello",
@@ -551,7 +551,7 @@ class TestRouterCustomVoiceRouting:
         mock_backend.generate_speech.assert_not_called()
 
     def test_speech_with_builtin_voice_skips_custom_path(self, monkeypatch):
-        """POST /v1/audio/speech with a built-in voice should NOT use custom path."""
+        """POST /qwen-3tts/v1/audio/speech with a built-in voice should NOT use custom path."""
         from fastapi.testclient import TestClient
         from api.main import app
         from api.backends import factory
@@ -568,7 +568,7 @@ class TestRouterCustomVoiceRouting:
 
         client = TestClient(app)
         response = client.post(
-            "/v1/audio/speech",
+            "/qwen-3tts/v1/audio/speech",
             json={
                 "model": "qwen3-tts",
                 "input": "Hello",
@@ -584,7 +584,7 @@ class TestRouterCustomVoiceRouting:
 class TestVoicesEndpointCustomVoiceLabels:
 
     def test_custom_voices_get_distinct_description(self):
-        """Custom voices in /v1/voices should have 'Custom cloned voice' description."""
+        """Custom voices in /qwen-3tts/v1/voices should have 'Custom cloned voice' description."""
         from fastapi.testclient import TestClient
         from api.main import app
         from api.backends import factory
@@ -598,7 +598,7 @@ class TestVoicesEndpointCustomVoiceLabels:
         factory._backend_instance = mock_backend
 
         client = TestClient(app)
-        response = client.get("/v1/voices")
+        response = client.get("/qwen-3tts/v1/voices")
         assert response.status_code == 200
 
         data = response.json()

@@ -53,7 +53,7 @@ def run_benchmark():
     OUTPUT_DIR.mkdir(exist_ok=True)
     
     client = OpenAI(
-        base_url="http://localhost:8880/v1",
+        base_url="http://localhost:8880/qwen-3tts/v1",
         api_key="not-needed"
     )
     
