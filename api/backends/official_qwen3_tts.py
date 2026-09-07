@@ -294,12 +294,62 @@ class OfficialQwen3TTSBackend(TTSBackend):
         return "Base" in self.model_name and "CustomVoice" not in self.model_name
 
     def get_model_type(self) -> str:
-        """Return the model type (base or customvoice)."""
+        """Return the model type (base, voicedesign, customvoice)."""
+        if "VoiceDesign" in self.model_name:
+            return "voicedesign"
         if "Base" in self.model_name:
             return "base"
         elif "CustomVoice" in self.model_name:
             return "customvoice"
         return "unknown"
+
+    def supports_voice_design(self) -> bool:
+        """Whether the loaded checkpoint accepts natural-language voice prompts."""
+        return self.get_model_type() == "voicedesign"
+
+    async def generate_voice_design(
+        self,
+        text: str,
+        instruct: str,
+        language: str = "Auto",
+        speed: float = 1.0,
+    ) -> Tuple[np.ndarray, int]:
+        """Generate speech from a natural-language voice description.
+
+        Unlike the optimized backend this cannot hot-swap checkpoints, so it
+        requires TTS_MODEL_NAME to already point at a VoiceDesign model.
+        """
+        if not self._ready:
+            await self.initialize()
+
+        if not self.supports_voice_design():
+            raise RuntimeError(
+                "Voice design requires a VoiceDesign model "
+                "(e.g. Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign). "
+                f"The current model ({self.model_name}) does not support it."
+            )
+
+        try:
+            wavs, sr = await asyncio.to_thread(
+                self.model.generate_voice_design,
+                text=text,
+                instruct=instruct,
+                language=language,
+            )
+            audio = wavs[0]
+
+            if speed != 1.0 and LIBROSA_AVAILABLE:
+                audio = librosa.effects.time_stretch(
+                    audio.astype(np.float32), rate=speed
+                )
+            elif speed != 1.0:
+                logger.warning("Speed adjustment requested but librosa not available")
+
+            return audio, sr
+
+        except Exception as e:
+            logger.error(f"Voice design generation failed: {e}")
+            raise RuntimeError(f"Voice design generation failed: {e}")
 
     async def generate_voice_clone(
         self,

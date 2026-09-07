@@ -702,6 +702,75 @@ async def create_speech(
                 )
 
         # ----------------------------------------------------------------
+        # Voice design: voice="design" sculpts a voice from `instruct`
+        # ----------------------------------------------------------------
+        if request.voice.strip().lower() == "design":
+            description = (request.instruct or "").strip()
+            if not description:
+                raise HTTPException(
+                    status_code=400,
+                    detail={
+                        "error": "missing_instruct",
+                        "message": (
+                            "voice='design' requires 'instruct' to describe the "
+                            "voice, e.g. \"a warm, gravelly middle-aged narrator\"."
+                        ),
+                        "type": "invalid_request_error",
+                    },
+                )
+
+            backend = await get_tts_backend()
+            if not hasattr(backend, "generate_voice_design"):
+                raise HTTPException(
+                    status_code=400,
+                    detail={
+                        "error": "voice_design_not_supported",
+                        "message": (
+                            "This backend cannot do voice design. Use "
+                            "TTS_BACKEND=optimized with a VoiceDesign entry in "
+                            "config.yaml, or point TTS_MODEL_NAME at a "
+                            "VoiceDesign checkpoint."
+                        ),
+                        "type": "invalid_request_error",
+                    },
+                )
+
+            gen_start = time.time()
+            async with _generation_semaphore:
+                audio, sample_rate = await backend.generate_voice_design(
+                    text=normalized_text,
+                    instruct=description,
+                    language=language,
+                    speed=request.speed,
+                )
+            gen_time = time.time() - gen_start
+            audio_dur = len(audio) / sample_rate if sample_rate > 0 else 0
+            logger.info(
+                f"Voice design done: gen={gen_time:.2f}s audio={audio_dur:.2f}s "
+                f"RTF={(gen_time / audio_dur) if audio_dur > 0 else 0:.2f}x"
+            )
+
+            try:
+                note_speech_activity(client_request.app, samples=len(audio))
+            except Exception:
+                pass
+
+            # Voice design has no streaming counterpart upstream, so a stream
+            # request is served as a single complete response.
+            fmt = request.response_format
+            audio_bytes = await asyncio.to_thread(
+                encode_audio, audio, fmt, sample_rate
+            )
+            return Response(
+                content=audio_bytes,
+                media_type=get_content_type(fmt),
+                headers={
+                    "Content-Disposition": f"inline; filename=speech.{fmt}",
+                    "Cache-Control": "no-cache",
+                },
+            )
+
+        # ----------------------------------------------------------------
         # Real-time streaming for built-in voices (optimized backend only)
         # ----------------------------------------------------------------
         if request.stream:
@@ -903,6 +972,16 @@ async def list_voices():
     
     default_languages = ["English", "Chinese", "Japanese", "Korean", "German", "French", "Spanish", "Russian", "Portuguese", "Italian"]
 
+    # Natural-language voice design (requires a VoiceDesign checkpoint)
+    design_voice = VoiceInfo(
+        id="design",
+        name="design",
+        description=(
+            "Voice designed from the 'instruct' description, e.g. "
+            "'a warm, gravelly middle-aged narrator'. Supports tags like [laughing]."
+        ),
+    ).model_dump()
+
     # Discover voice library profiles (clone: prefix voices)
     clone_voices: List[dict] = []
     profiles_dir = VOICE_LIBRARY_DIR / "profiles"
@@ -965,7 +1044,7 @@ async def list_voices():
             voices += [v.model_dump() for v in openai_voices]
 
         return {
-            "voices": voices + clone_voices,
+            "voices": voices + [design_voice] + clone_voices,
             "languages": languages if languages else default_languages,
         }
         
@@ -976,6 +1055,7 @@ async def list_voices():
             "voices": (
                 [v.model_dump() for v in default_voices]
                 + [v.model_dump() for v in openai_voices]
+                + [design_voice]
                 + clone_voices
             ),
             "languages": default_languages,

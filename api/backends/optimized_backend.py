@@ -110,10 +110,31 @@ class OptimizedQwen3TTSBackend(TTSBackend):
 
     def _base_model_key(self) -> str:
         """Return the first Base model key from config, falling back to '0.6B-Base'."""
-        for key, cfg in self.config.get("models", {}).items():
-            if isinstance(cfg, dict) and cfg.get("type") == "base":
-                return key
-        return "0.6B-Base"
+        return self._model_key_of_type("base", "0.6B-Base")
+
+    def _voice_design_model_key(self) -> str:
+        """Return the first VoiceDesign model key, falling back to '0.6B-VoiceDesign'."""
+        return self._model_key_of_type("voicedesign", "0.6B-VoiceDesign")
+
+    def _model_key_of_type(self, model_type: str, fallback: str) -> str:
+        """Return the first configured model key of *model_type*.
+
+        Prefers a key matching the active model's size so switching between
+        capabilities does not silently drop from 1.7B to 0.6B.
+        """
+        candidates = [
+            key
+            for key, cfg in self.config.get("models", {}).items()
+            if isinstance(cfg, dict) and cfg.get("type") == model_type
+        ]
+        if not candidates:
+            return fallback
+        if self.current_model_key:
+            size = self.current_model_key.split("-", 1)[0]
+            for key in candidates:
+                if key.startswith(f"{size}-"):
+                    return key
+        return candidates[0]
 
     def _model_info(self, model_key: str) -> dict:
         return self.config.get("models", {}).get(model_key, {})
@@ -220,6 +241,8 @@ class OptimizedQwen3TTSBackend(TTSBackend):
         try:
             if model_type == "base":
                 await self._warmup_base_model(dummy_audio, emit_every, decode_window)
+            elif model_type == "voicedesign":
+                await self._warmup_voice_design_model()
             else:
                 await self._warmup_customvoice_model(emit_every, decode_window)
         except Exception as exc:
@@ -273,6 +296,21 @@ class OptimizedQwen3TTSBackend(TTSBackend):
         ):
             pass
         logger.info("Warmup complete (base)")
+
+    async def _warmup_voice_design_model(self) -> None:
+        """Single-pass warmup for the VoiceDesign model.
+
+        There is no streaming entry point for voice design upstream, so unlike
+        the other two this only exercises the non-streaming path.
+        """
+        logger.info("Warmup 1/1: VoiceDesign — non-streaming…")
+        await asyncio.to_thread(
+            self.model.generate_voice_design,
+            text="This is a warmup sentence to trigger kernel compilation.",
+            instruct="A calm, neutral narrator voice.",
+            language="English",
+        )
+        logger.info("Warmup complete (voicedesign)")
 
     async def _warmup_customvoice_model(
         self, emit_every: int, decode_window: int
@@ -396,6 +434,40 @@ class OptimizedQwen3TTSBackend(TTSBackend):
             decode_window_frames=decode_window_frames,
         ):
             yield chunk, sr
+
+    async def generate_voice_design(
+        self,
+        text: str,
+        instruct: str,
+        language: str = "Auto",
+        speed: float = 1.0,
+    ) -> Tuple[np.ndarray, int]:
+        """Generate speech from a natural-language voice description.
+
+        Uses the VoiceDesign checkpoint, hot-swapping to it if another model is
+        currently loaded. There is no streaming counterpart upstream.
+        """
+        await self._ensure_model_loaded(self._voice_design_model_key())
+
+        t0 = time.time()
+        wavs, sr = await asyncio.to_thread(
+            self.model.generate_voice_design,
+            text=text,
+            instruct=instruct,
+            language=language,
+        )
+        logger.info(f"Voice design: generate={time.time()-t0:.3f}s")
+
+        audio = wavs[0]
+        if speed != 1.0:
+            try:
+                import librosa
+                audio = librosa.effects.time_stretch(
+                    audio.astype(np.float32), rate=speed
+                )
+            except ImportError:
+                pass
+        return audio, sr
 
     async def generate_voice_clone(
         self,

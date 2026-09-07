@@ -16,12 +16,15 @@ and profile storage directory.  See README or docstrings for usage.
 
 import argparse
 import base64
+import io
 import json
 import mimetypes
 import os
 import shutil
 import tempfile
+import time
 import uuid
+import wave
 import zipfile
 from dataclasses import dataclass
 from datetime import datetime
@@ -223,6 +226,105 @@ def request_tts(base_url: str, payload: Dict[str, Any], timeout_s: float) -> Tup
     return r.content, ext
 
 
+# Real-time streaming playback.
+#
+# The API emits signed 16-bit little-endian mono PCM at 24 kHz when called with
+# stream=true and response_format="pcm".  Gradio plays a streamed sequence of
+# self-contained WAV chunks, and wants each one to be at least ~1 s long for
+# gapless playback, so the server's smaller chunks are coalesced before being
+# handed to the player.
+STREAM_SAMPLE_RATE = 24000
+STREAM_MIN_CHUNK_SECONDS = 1.0
+_STREAM_MIN_CHUNK_BYTES = int(STREAM_SAMPLE_RATE * STREAM_MIN_CHUNK_SECONDS) * 2
+
+
+def pcm_to_wav_bytes(pcm: bytes, sample_rate: int = STREAM_SAMPLE_RATE) -> bytes:
+    """Wrap signed 16-bit little-endian mono PCM in a WAV container."""
+    buffer = io.BytesIO()
+    with wave.open(buffer, "wb") as wav_file:
+        wav_file.setnchannels(1)
+        wav_file.setsampwidth(2)
+        wav_file.setframerate(sample_rate)
+        wav_file.writeframes(pcm)
+    return buffer.getvalue()
+
+
+def request_tts_stream(base_url: str, payload: Dict[str, Any], timeout_s: float):
+    """Yield raw PCM chunks from /v1/audio/speech as the server produces them."""
+    url = normalize_base_url(base_url) + "/v1/audio/speech"
+    stream_payload = dict(payload)
+    stream_payload["stream"] = True
+    stream_payload["response_format"] = "pcm"
+    with httpx.Client(timeout=timeout_s) as client:
+        with client.stream("POST", url, json=stream_payload) as response:
+            response.raise_for_status()
+            for chunk in response.iter_bytes():
+                if chunk:
+                    yield chunk
+
+
+def stream_tts_chunks(base_url: str, payload: Dict[str, Any], timeout_s: float):
+    """Stream a generation as playable WAV files.
+
+    Yields ``("chunk", path, seconds_so_far)`` while audio arrives and finally
+    ``("final", path, total_seconds)`` holding the complete clip, so callers can
+    both play along and keep a downloadable file.
+    """
+    collected = bytearray()
+    pending = bytearray()
+
+    def _flush() -> str:
+        # Chunk boundaries from the HTTP stream can land mid-sample. Emitting an
+        # odd byte count would shift every later sample by one byte and turn the
+        # rest of the clip into noise, so keep any stray byte for the next flush.
+        usable = len(pending) - (len(pending) % 2)
+        frames = bytes(pending[:usable])
+        del pending[:usable]
+        return write_bytes_to_temp_audio(pcm_to_wav_bytes(frames), "wav")
+
+    for pcm in request_tts_stream(base_url, payload, timeout_s):
+        collected.extend(pcm)
+        pending.extend(pcm)
+        if len(pending) >= _STREAM_MIN_CHUNK_BYTES:
+            yield "chunk", _flush(), len(collected) / 2 / STREAM_SAMPLE_RATE
+
+    if len(pending) >= 2:
+        yield "chunk", _flush(), len(collected) / 2 / STREAM_SAMPLE_RATE
+    if len(collected) < 2:
+        raise gr.Error("The server returned no audio for this request.")
+
+    complete = bytes(collected[: len(collected) - (len(collected) % 2)])
+    total_seconds = len(complete) / 2 / STREAM_SAMPLE_RATE
+    yield "final", write_bytes_to_temp_audio(pcm_to_wav_bytes(complete), "wav"), total_seconds
+
+
+def stream_tts_into_outputs(base_url: str, payload: Dict[str, Any], timeout_s: float):
+    """Drive a streaming generation and yield Gradio output tuples.
+
+    Each tuple is ``(stream_chunk, final_audio, download, status)``.  While
+    audio is arriving only the streaming player is updated; the last tuple fills
+    in the complete clip for the normal player and the download slot.
+    """
+    started = time.monotonic()
+    ttfb: Optional[float] = None
+
+    for kind, path, seconds in stream_tts_chunks(base_url, payload, timeout_s):
+        if kind == "chunk":
+            if ttfb is None:
+                ttfb = time.monotonic() - started
+            yield path, gr.skip(), gr.skip(), (
+                f"🔊 Streaming — first audio after {ttfb:.1f}s, "
+                f"{seconds:.1f}s generated…"
+            )
+        else:
+            elapsed = time.monotonic() - started
+            rtf = elapsed / seconds if seconds > 0 else 0.0
+            yield gr.skip(), path, path, (
+                f"✅ {seconds:.1f}s of audio in {elapsed:.1f}s "
+                f"(first audio after {ttfb or elapsed:.1f}s, RTF {rtf:.2f})."
+            )
+
+
 def try_fetch_voices(base_url: str, timeout_s: float) -> List[str]:
     """Attempt to fetch available voices from the /v1/voices endpoint."""
     url = normalize_base_url(base_url) + "/v1/voices"
@@ -406,9 +508,19 @@ def build_app(initial_base_url: str, initial_library_dir: Path) -> gr.Blocks:
                                     value="Hello! This is my saved preset voice profile.",
                                     lines=3,
                                 )
+                                preset_stream_toggle = gr.Checkbox(
+                                    label="Stream audio while generating",
+                                    value=True,
+                                    info="Play audio as it is produced instead of waiting for the whole clip.",
+                                )
                                 preset_generate_btn = gr.Button("Generate", variant="primary")
                                 preset_save_btn = gr.Button("Save profile", variant="secondary")
                             with gr.Column(scale=1, min_width=320):
+                                preset_stream_audio = gr.Audio(
+                                    label="Live stream",
+                                    streaming=True,
+                                    autoplay=True,
+                                )
                                 preset_audio = gr.Audio(label="Output audio", type="filepath")
                                 preset_download = gr.File(label="Download audio")
 
@@ -532,8 +644,18 @@ def build_app(initial_base_url: str, initial_library_dir: Path) -> gr.Blocks:
                             value="wav",
                         )
                         play_speed = gr.Slider(label="Speed", minimum=0.25, maximum=4.0, value=1.0, step=0.05)
+                        play_stream_toggle = gr.Checkbox(
+                            label="Stream audio while generating",
+                            value=True,
+                            info="Streaming always returns WAV; the format above applies to non-streamed runs.",
+                        )
                         play_generate_btn = gr.Button("Generate", variant="primary")
                     with gr.Column(scale=1, min_width=360):
+                        play_stream_audio = gr.Audio(
+                            label="Live stream",
+                            streaming=True,
+                            autoplay=True,
+                        )
                         play_audio = gr.Audio(label="Output audio", type="filepath")
                         play_download = gr.File(label="Download audio")
 
@@ -550,7 +672,15 @@ def build_app(initial_base_url: str, initial_library_dir: Path) -> gr.Blocks:
                 f"✅ Loaded {len(voices)} voices from server (or fallback list).",
             )
 
-        def on_generate_preset(base_url: str, timeout_s: float, voice: str, language: str, instructions: str, text: str):
+        def on_generate_preset(
+            base_url: str,
+            timeout_s: float,
+            voice: str,
+            language: str,
+            instructions: str,
+            text: str,
+            stream: bool,
+        ):
             payload = {
                 "input": text,
                 "voice": voice,
@@ -559,9 +689,12 @@ def build_app(initial_base_url: str, initial_library_dir: Path) -> gr.Blocks:
                 "instructions": instructions or "",
                 "response_format": "wav",
             }
-            audio_bytes, ext = request_tts(base_url, payload, float(timeout_s))
-            out_path = write_bytes_to_temp_audio(audio_bytes, ext)
-            return out_path, out_path, "✅ Generated audio."
+            if not stream:
+                audio_bytes, ext = request_tts(base_url, payload, float(timeout_s))
+                out_path = write_bytes_to_temp_audio(audio_bytes, ext)
+                yield gr.skip(), out_path, out_path, "✅ Generated audio."
+                return
+            yield from stream_tts_into_outputs(base_url, payload, float(timeout_s))
 
         def on_save_preset(library_dir_str: str, name: str, voice: str, language: str, instructions: str):
             if not name.strip():
@@ -584,10 +717,13 @@ def build_app(initial_base_url: str, initial_library_dir: Path) -> gr.Blocks:
                 raise gr.Error("Voice design instructions are required.")
             payload = {
                 "input": ref_line,
-                "voice": "Vivian",
+                # voice="design" routes to the VoiceDesign checkpoint and uses
+                # `instruct` as the description. The old task_type/instructions
+                # keys are not part of the request schema and were discarded,
+                # which is why every designed voice came back as Vivian.
+                "voice": "design",
                 "language": language,
-                "task_type": "VoiceDesign",
-                "instructions": instructions.strip(),
+                "instruct": instructions.strip(),
                 "response_format": "wav",
             }
             audio_bytes, ext = request_tts(base_url, payload, float(timeout_s))
@@ -733,6 +869,7 @@ def build_app(initial_base_url: str, initial_library_dir: Path) -> gr.Blocks:
             text: str,
             fmt: str,
             speed: float,
+            stream: bool,
         ):
             if not pid:
                 raise gr.Error("Pick a saved profile.")
@@ -772,9 +909,12 @@ def build_app(initial_base_url: str, initial_library_dir: Path) -> gr.Blocks:
                     "voice": vp.voice or "Vivian",
                     "instructions": vp.instructions or "",
                 })
-            audio_bytes, ext = request_tts(base_url, payload, float(timeout_s))
-            out_path = write_bytes_to_temp_audio(audio_bytes, ext)
-            return out_path, out_path
+            if not stream:
+                audio_bytes, ext = request_tts(base_url, payload, float(timeout_s))
+                out_path = write_bytes_to_temp_audio(audio_bytes, ext)
+                yield gr.skip(), out_path, out_path, "✅ Generated audio."
+                return
+            yield from stream_tts_into_outputs(base_url, payload, float(timeout_s))
 
         # ------------------------------------------------------------------
         # Wire up UI interactions to callbacks
@@ -788,8 +928,8 @@ def build_app(initial_base_url: str, initial_library_dir: Path) -> gr.Blocks:
 
         preset_generate_btn.click(
             fn=on_generate_preset,
-            inputs=[base_url_in, timeout_in, preset_voice, preset_language, preset_instructions, preset_test_text],
-            outputs=[preset_audio, preset_download, global_log],
+            inputs=[base_url_in, timeout_in, preset_voice, preset_language, preset_instructions, preset_test_text, preset_stream_toggle],
+            outputs=[preset_stream_audio, preset_audio, preset_download, global_log],
         )
         preset_save_btn.click(
             fn=on_save_preset,
@@ -852,8 +992,8 @@ def build_app(initial_base_url: str, initial_library_dir: Path) -> gr.Blocks:
 
         play_generate_btn.click(
             fn=on_play_generate,
-            inputs=[base_url_in, timeout_in, library_dir_in, play_profile_id, play_text, play_response_format, play_speed],
-            outputs=[play_audio, play_download],
+            inputs=[base_url_in, timeout_in, library_dir_in, play_profile_id, play_text, play_response_format, play_speed, play_stream_toggle],
+            outputs=[play_stream_audio, play_audio, play_download, global_log],
         )
 
         demo.load(fn=on_library_refresh, inputs=[library_dir_in], outputs=[library_table, play_profile_id])

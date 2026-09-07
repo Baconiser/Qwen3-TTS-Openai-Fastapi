@@ -6,20 +6,34 @@
 default_model: 1.7B-CustomVoice
 
 # Available models.  Each entry maps a short name to a HuggingFace repo id (or
-# a local path) and a model type ("customvoice" or "base").
+# a local path) and a model type ("customvoice", "voicedesign" or "base").
 #
 # - customvoice  — predefined speakers (Vivian, Ryan, …); fastest for bulk TTS
+# - voicedesign  — voices sculpted from a natural-language description passed as
+#                  `instruct`, e.g. "a warm, gravelly middle-aged narrator".
+#                  Request it with voice="design". Supports performance tags such
+#                  as [laughing] / [sighing]. Non-streaming only: the upstream
+#                  model exposes no stream_generate_voice_design.
 # - base         — required for voice cloning (clone: prefix) and voice library
+#
+# The server hot-swaps between these on demand, so a request for a voice the
+# active model cannot serve loads the right checkpoint first (costing one load).
 models:
   0.6B-CustomVoice:
     hf_id: Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice
     type: customvoice
+  0.6B-VoiceDesign:
+    hf_id: Qwen/Qwen3-TTS-12Hz-0.6B-VoiceDesign
+    type: voicedesign
   0.6B-Base:
     hf_id: Qwen/Qwen3-TTS-12Hz-0.6B-Base
     type: base
   1.7B-CustomVoice:
     hf_id: Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice
     type: customvoice
+  1.7B-VoiceDesign:
+    hf_id: Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign
+    type: voicedesign
   1.7B-Base:
     hf_id: Qwen/Qwen3-TTS-12Hz-1.7B-Base
     type: base
