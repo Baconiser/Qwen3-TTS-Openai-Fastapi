@@ -39,7 +39,10 @@ optimization:
 
   # Whether to enable torch.compile at all.  Set to false to skip compilation
   # (faster startup, lower throughput).
-  use_compile: true
+  # SIGSEGV (exit 139) on RTX 4000 SFF Ada / CUDA 12.1 container at the first
+  # compiled execution, at every compile_mode. Inductor codegen is unusable
+  # on this box; streaming (below) is the latency win instead.
+  use_compile: false
 
   # Whether to capture CUDA graphs (works on both CUDA and ROCm).
   # Required for max-autotune to reach peak performance.
