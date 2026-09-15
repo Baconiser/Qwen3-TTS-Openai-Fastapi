@@ -112,6 +112,14 @@ class OptimizedQwen3TTSBackend(TTSBackend):
         """Return the first Base model key from config, falling back to '0.6B-Base'."""
         return self._model_key_of_type("base", "0.6B-Base")
 
+    def _custom_voice_model_key(self) -> str:
+        """Return the first CustomVoice model key, falling back to '0.6B-CustomVoice'.
+
+        Preset speakers need a CustomVoice checkpoint regardless of which model
+        default_model names, so this is used instead of the default key.
+        """
+        return self._model_key_of_type("customvoice", "0.6B-CustomVoice")
+
     def _voice_design_model_key(self) -> str:
         """Return the first VoiceDesign model key, falling back to '0.6B-VoiceDesign'."""
         return self._model_key_of_type("voicedesign", "0.6B-VoiceDesign")
@@ -383,8 +391,7 @@ class OptimizedQwen3TTSBackend(TTSBackend):
         model: str = "tts-1",
     ) -> Tuple[np.ndarray, int]:
         """Non-streaming CustomVoice generation."""
-        model_key = self._default_model_key()
-        await self._ensure_model_loaded(model_key)
+        await self._ensure_model_loaded(self._custom_voice_model_key())
 
         wavs, sr = self.model.generate_custom_voice(
             text=text,
@@ -418,8 +425,7 @@ class OptimizedQwen3TTSBackend(TTSBackend):
 
         Yields (pcm_chunk, sample_rate) tuples as the model generates audio.
         """
-        model_key = self._default_model_key()
-        await self._ensure_model_loaded(model_key)
+        await self._ensure_model_loaded(self._custom_voice_model_key())
 
         streaming_opts = self.config.get("optimization", {}).get("streaming", {})
         decode_window_frames = streaming_opts.get("decode_window_frames", 80)

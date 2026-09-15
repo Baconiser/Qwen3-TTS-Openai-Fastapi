@@ -685,8 +685,7 @@ def build_app(initial_base_url: str, initial_library_dir: Path) -> gr.Blocks:
                 "input": text,
                 "voice": voice,
                 "language": language,
-                "task_type": "CustomVoice",
-                "instructions": instructions or "",
+                "instruct": instructions or None,
                 "response_format": "wav",
             }
             if not stream:
@@ -880,34 +879,29 @@ def build_app(initial_base_url: str, initial_library_dir: Path) -> gr.Blocks:
                 "speed": float(speed),
                 "language": vp.language,
             }
+            # The speech endpoint only reads voice/instruct: ref_audio, ref_text,
+            # task_type and instructions are not in its schema and are dropped,
+            # which sent every clone profile to the preset speaker Vivian.
             if vp.task_type == "CustomVoice":
                 payload.update({
-                    "task_type": "CustomVoice",
                     "voice": vp.voice,
-                    "instructions": vp.instructions or "",
+                    "instruct": vp.instructions or None,
                 })
             elif vp.task_type == "Base":
-                payload.update({
-                    "task_type": "Base",
-                    "voice": vp.voice or "Vivian",
-                    "x_vector_only_mode": bool(vp.x_vector_only_mode),
-                })
-                if vp.ref_audio_filename:
-                    ref_file = profile_dir(Path(library_dir_str), vp.profile_id) / vp.ref_audio_filename
-                    if not ref_file.exists():
-                        raise gr.Error("This profile is missing its reference audio file.")
-                    payload["ref_audio"] = data_uri_from_file(ref_file)
-                else:
+                if not vp.ref_audio_filename:
                     raise gr.Error("This Base profile has no stored ref_audio.")
-                if not vp.x_vector_only_mode:
-                    if not vp.ref_text.strip():
-                        raise gr.Error("This profile needs ref_text unless x_vector_only_mode is enabled.")
-                    payload["ref_text"] = vp.ref_text.strip()
+                ref_file = profile_dir(Path(library_dir_str), vp.profile_id) / vp.ref_audio_filename
+                if not ref_file.exists():
+                    raise gr.Error("This profile is missing its reference audio file.")
+                if not vp.x_vector_only_mode and not vp.ref_text.strip():
+                    raise gr.Error("This profile needs ref_text unless x_vector_only_mode is enabled.")
+                # The server loads the profile from the shared voice library by
+                # id; the id is unique where names may collide.
+                payload["voice"] = f"clone:{vp.profile_id}"
             else:
                 payload.update({
-                    "task_type": "VoiceDesign",
-                    "voice": vp.voice or "Vivian",
-                    "instructions": vp.instructions or "",
+                    "voice": "design",
+                    "instruct": vp.instructions or "",
                 })
             if not stream:
                 audio_bytes, ext = request_tts(base_url, payload, float(timeout_s))
