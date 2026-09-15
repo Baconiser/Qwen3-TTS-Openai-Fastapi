@@ -674,10 +674,13 @@ class Qwen3TTSModel:
         for i, wav in enumerate(wavs_all):
             ref_code_list = voice_clone_prompt_dict.get("ref_code", None)
             if ref_code_list is not None and ref_code_list[i] is not None:
+                # Keep the generated frames' samples, counted from the end:
+                # decoded audio is shorter at the start than frames * upsample,
+                # so a proportional cut would leave a sliver of the reference.
                 ref_len = int(ref_code_list[i].shape[0])
                 total_len = int(codes_for_decode[i].shape[0])
-                cut = int(ref_len / max(total_len, 1) * wav.shape[0])
-                wavs_out.append(wav[cut:])
+                gen_samples = (total_len - ref_len) * self.model.speech_tokenizer.get_decode_upsample_rate()
+                wavs_out.append(wav[max(0, wav.shape[0] - gen_samples):])
             else:
                 wavs_out.append(wav)
 

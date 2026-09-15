@@ -416,7 +416,7 @@ Review device mappings in `docker-compose.rocm.yml`; render-node names vary betw
 | `TTS_CUSTOM_VOICES` | `./custom_voices` | Legacy/custom voice directory |
 | `TTS_CONFIG` | `~/qwen3-tts/config.yaml` | Optimized-backend YAML |
 | `GPU_KEEPALIVE_INTERVAL` | `0` | Optional GPU keepalive interval in seconds |
-| `TTS_AUTOCHUNK` | `true` | Enable punctuation-aware input splitting |
+| `TTS_AUTOCHUNK` | `false` | Enable punctuation-aware input splitting (each chunk restarts prosody) |
 | `TTS_MIN_CHUNK_CHARS` | `20` | Soft minimum chunk length |
 | `TTS_MAX_CHUNK_CHARS` | `70` | Target maximum chunk length |
 | `TTS_CHUNK_GAP_MS` | `120` | Silence inserted between generated chunks |

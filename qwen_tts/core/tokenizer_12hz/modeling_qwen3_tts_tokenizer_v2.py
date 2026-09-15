@@ -220,14 +220,17 @@ class Qwen3TTSTokenizerV2CausalTransConvNet(nn.Module):
         super().__init__()
         self.conv = nn.ConvTranspose1d(in_channels, out_channels, kernel_size, stride=stride)
 
+        # Trim both edges like upstream Qwen3-TTS (the checkpoints were trained
+        # this way). The output stays end-aligned with the input but is `pad`
+        # samples short at the start, so decoded audio is shorter than
+        # frames * upsample rate: slice it by counting samples from the end.
         pad = kernel_size - stride
-        self.left_pad = 0
-        self.right_pad = int(pad)
+        self.left_pad = math.ceil(pad)
+        self.right_pad = pad = self.left_pad
 
     def forward(self, hidden_state):
         hidden_state = self.conv(hidden_state)
-        if self.right_pad > 0:
-            hidden_state = hidden_state[..., : hidden_state.shape[-1] - self.right_pad]
+        hidden_state = hidden_state[..., self.left_pad : hidden_state.shape[-1] - self.right_pad]
         return hidden_state.contiguous()
 
 
@@ -922,7 +925,10 @@ class Qwen3TTSTokenizerV2Decoder(Qwen3TTSTokenizerV2DecoderPreTrainedModel):
             context_size = left_context_size if start_index - left_context_size > 0 else start_index
             codes_chunk = codes[..., start_index - context_size : end_index]
             wav_chunk = self(codes_chunk)
-            wavs.append(wav_chunk[..., context_size * self.total_upsample :])
+            # Take the chunk's own frames from the end; cutting the context off
+            # the front would also drop the start-of-window shortfall.
+            new_samples = (end_index - start_index) * int(self.total_upsample)
+            wavs.append(wav_chunk[..., max(0, wav_chunk.shape[-1] - new_samples) :])
             start_index = end_index
         return torch.cat(wavs, dim=-1)
 
@@ -1088,13 +1094,11 @@ class Qwen3TTSTokenizerV2Decoder(Qwen3TTSTokenizerV2DecoderPreTrainedModel):
         # Run forward (uses compiled path if available)
         wav = self.forward_optimized(codes_padded)
 
-        # Trim padding from output
+        # Trim padding from output: the real frames are the last T * upsample
+        # samples (the decoder output is end-aligned with its input)
         if T < target_length:
-            # Calculate how many samples correspond to the padding frames
-            total_samples = wav.shape[-1]
-            samples_per_frame = total_samples / target_length
-            trim_samples = int((target_length - T) * samples_per_frame)
-            wav = wav[..., trim_samples:]
+            new_samples = T * int(self.total_upsample)
+            wav = wav[..., max(0, wav.shape[-1] - new_samples) :]
 
         return wav
 
@@ -1216,6 +1220,11 @@ class Qwen3TTSTokenizerV2Model(Qwen3TTSTokenizerV2PreTrainedModel):
 
         audio_codes = torch.clamp(audio_codes, min=0)
         audio_values = self.decoder.chunked_decode(audio_codes.transpose(1, 2)).squeeze(1)
+        # The decoded audio ends where the codes end but is shorter than
+        # frames * upsample rate, so every sample's real audio stops that much
+        # earlier too.
+        shortfall = audio_codes.shape[1] * self.decode_upsample_rate - audio_values.shape[-1]
+        audio_lengths = (audio_lengths - shortfall).clamp(min=0)
 
         audio_values = [a[:l] for a, l in zip(audio_values, audio_lengths)]
 

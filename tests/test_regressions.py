@@ -28,6 +28,29 @@ def test_currency_is_not_misread_as_inches():
     assert "minute" in normalized
 
 
+def test_english_rules_skip_explicit_non_english_language():
+    text = "Es kostet 3,5 % mehr, ca. 12 Min. ab 14:30 Uhr."
+    assert normalize_text(text, language="German") == text
+
+
+def test_auto_language_detects_german_and_keeps_digits():
+    normalized = normalize_text("Das ist nicht 1.500 € für die Miete\nund 20 % Rabatt.")
+    assert normalized == "Das ist nicht 1.500 € für die Miete und 20 % Rabatt."
+
+
+def test_auto_language_skips_english_rules_for_non_latin_scripts():
+    assert normalize_text("Это стоит 25 рублей.") == "Это стоит 25 рублей."
+    assert normalize_text("我有3个苹果。") == "我有3个苹果。"
+
+
+def test_non_english_gets_neutral_quote_cleanup():
+    assert normalize_text("Er sagte „Hallo“ und  ging.", language="German") == 'Er sagte "Hallo" und ging.'
+
+
+def test_explicit_english_still_expands_numbers():
+    assert "twenty" in normalize_text("Das 20", language="English")
+
+
 def test_pcm_is_signed_16_bit_little_endian():
     payload = convert_to_pcm(np.array([-1.0, 0.0, 1.0], dtype=np.float32))
     assert struct.unpack("<hhh", payload) == (-32768, 0, 32767)

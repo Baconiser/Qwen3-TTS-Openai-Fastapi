@@ -55,18 +55,21 @@ _generation_semaphore = asyncio.Semaphore(_MAX_CONCURRENT)
 # (, ; :), then word boundaries. Chunks are packed greedily up to max_chars and
 # kept at/above min_chars where possible (a too-small piece is merged with a
 # neighbour as long as the result still fits within max_chars).
-#   TTS_AUTOCHUNK=false        disable entirely
+#
+# Off by default: every chunk restarts prosody and re-samples the voice, so long
+# inputs sound choppier than one generation over the whole text.
+#   TTS_AUTOCHUNK=true         enable
 #   TTS_MIN_CHUNK_CHARS=20     soft lower bound per chunk
 #   TTS_MAX_CHUNK_CHARS=70     hard upper bound per chunk
 #   TTS_CHUNK_GAP_MS=120       silence inserted between merged chunks
 try:
-    _AUTOCHUNK = os.getenv("TTS_AUTOCHUNK", "true").lower() == "true"
+    _AUTOCHUNK = os.getenv("TTS_AUTOCHUNK", "false").lower() == "true"
     _MIN_CHUNK_CHARS = max(1, int(os.getenv("TTS_MIN_CHUNK_CHARS", "20")))
     _MAX_CHUNK_CHARS = max(_MIN_CHUNK_CHARS, int(os.getenv("TTS_MAX_CHUNK_CHARS", "70")))
     _CHUNK_GAP_MS = max(0, int(os.getenv("TTS_CHUNK_GAP_MS", "120")))
 except ValueError:
     logger.warning("Invalid auto-chunk env value; using defaults")
-    _AUTOCHUNK, _MIN_CHUNK_CHARS, _MAX_CHUNK_CHARS, _CHUNK_GAP_MS = True, 20, 70, 120
+    _AUTOCHUNK, _MIN_CHUNK_CHARS, _MAX_CHUNK_CHARS, _CHUNK_GAP_MS = False, 20, 70, 120
 
 
 def _pieces(text: str, max_chars: int) -> List[str]:
@@ -480,8 +483,14 @@ async def create_speech(
         )
     
     try:
-        # Normalize input text
-        normalized_text = normalize_text(request.input, request.normalization_options)
+        # Extract language from model name if present, otherwise use request language
+        model_language = extract_language_from_model(request.model)
+        language = model_language if model_language else (request.language or "Auto")
+
+        # Normalize input text (English-only rewrites are skipped for other languages)
+        normalized_text = normalize_text(
+            request.input, request.normalization_options, language=language
+        )
         
         if not normalized_text.strip():
             raise HTTPException(
@@ -493,10 +502,6 @@ async def create_speech(
                 },
             )
         
-        # Extract language from model name if present, otherwise use request language
-        model_language = extract_language_from_model(request.model)
-        language = model_language if model_language else (request.language or "Auto")
-
         # ----------------------------------------------------------------
         # Voice library: "clone:ProfileName" -> load profile + voice clone
         # ----------------------------------------------------------------
@@ -1171,7 +1176,9 @@ async def create_voice_clone(
             )
 
         # Normalize input text
-        normalized_text = normalize_text(request.input, request.normalization_options)
+        normalized_text = normalize_text(
+            request.input, request.normalization_options, language=request.language
+        )
 
         if not normalized_text.strip():
             raise HTTPException(

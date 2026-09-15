@@ -296,14 +296,72 @@ def handle_time(match: re.Match[str]) -> str:
     return " ".join(numbers)
 
 
-def normalize_text(text: str, options: Optional[NormalizationOptions] = None) -> str:
-    """Normalize URLs, email, numbers, units, punctuation, and symbols for TTS."""
+# The rewrites below are English-only: numbers are spelled out with inflect,
+# "%" becomes "percent", "Mr." becomes "Mister", and digit-grouping commas are
+# dropped (turning German "3,5" into "35"). Other languages only get the
+# language-neutral cleanup, since Qwen3 reads digits, symbols and native
+# punctuation in those languages by itself.
+_NON_LATIN_SCRIPT = re.compile(r"[Ѐ-ӿ぀-ヿ㐀-鿿가-힯]")
+_LATIN_DIACRITICS = re.compile(r"[äöüßàâæçéèêëîïôœùûÿñáíóúãõìò¡¿]", re.IGNORECASE)
+_ENGLISH_MARKERS = frozenset(
+    "the and is are was were of to that this it you your with for have has "
+    "not what will would can from".split()
+)
+_OTHER_LATIN_MARKERS = frozenset(
+    # German
+    "der die das und ist nicht ich du wir sie ein eine mit für auf auch sich "
+    # French
+    "le la les et est une des pas que qui dans pour avec "
+    # Spanish, Portuguese, Italian
+    "el los las y es una por para con del não uma com il di che sono della".split()
+)
+
+
+def is_english_text(text: str, language: Optional[str] = None) -> bool:
+    """Return whether the English normalization rules apply to *text*.
+
+    An explicit language wins; for ``Auto`` (or no language) the script and a
+    handful of common function words decide.
+    """
+    lang = (language or "auto").strip().lower()
+    if lang != "auto":
+        return lang in ("english", "en")
+    if _NON_LATIN_SCRIPT.search(text):
+        return False
+    words = re.findall(r"[^\W\d_]+", text.lower())
+    english = sum(word in _ENGLISH_MARKERS for word in words)
+    other = sum(word in _OTHER_LATIN_MARKERS for word in words)
+    if other > english:
+        return False
+    return not (other == english and _LATIN_DIACRITICS.search(text))
+
+
+def _normalize_language_neutral(text: str) -> str:
+    """Unify quotes and whitespace without touching words, digits or symbols."""
+    text = text.replace("‘", "'").replace("’", "'").replace("‚", "'")
+    text = re.sub(r"[«»“”„]", '"', text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def normalize_text(
+    text: str,
+    options: Optional[NormalizationOptions] = None,
+    language: Optional[str] = None,
+) -> str:
+    """Normalize URLs, email, numbers, units, punctuation, and symbols for TTS.
+
+    The full rule set only runs for English (see ``is_english_text``); other
+    languages get quote and whitespace cleanup only.
+    """
     if not isinstance(text, str):
         raise TypeError("text must be a string")
 
     options = options or NormalizationOptions()
     if not options.normalize:
         return text
+
+    if not is_english_text(text, language):
+        return _normalize_language_neutral(text)
 
     if options.email_normalization:
         text = EMAIL_PATTERN.sub(handle_email, text)

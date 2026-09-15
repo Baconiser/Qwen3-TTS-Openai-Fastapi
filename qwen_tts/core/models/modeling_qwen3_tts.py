@@ -2823,12 +2823,13 @@ class Qwen3TTSForConditionalGeneration(Qwen3TTSPreTrainedModel, GenerationMixin)
             wavs, sr = self.speech_tokenizer.decode([{"audio_codes": window.to(self.talker.device)}])
             wav = wavs[0].astype(np.float32)
 
-            # Extract only the new samples (skip ref_code and context portions)
+            # Extract only the new samples (skip ref_code and context portions).
+            # Decoded audio is end-aligned with the codes but shorter at the
+            # start, so count the new frames' samples from the end.
             skip_frames = flush_ref_prefix_frames + context_frames
             if skip_frames > 0:
-                samples_per_frame = len(wav) / window.shape[0]
-                skip_samples = int(skip_frames * samples_per_frame)
-                wav = wav[skip_samples:]
+                new_samples = remaining_frames * self.speech_tokenizer.get_decode_upsample_rate()
+                wav = wav[max(0, len(wav) - new_samples):]
 
             # Crossfade with previous tail
             if decoded_tail is not None and overlap_samples > 0 and len(wav) > 0:
